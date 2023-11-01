@@ -24,22 +24,20 @@ int main() {
     }
     Eigen::SparseMatrix<double> M(n, n);
     M.insertFromTriplets(triplets.begin(), triplets.end());
+    std::cout << M << std::endl;
 
     // Construct matrix operation object using the wrapper class SparseGenMatProd
     SparseGenMatProd<double> op(M);
 
     // Construct eigen solver object, requesting the largest three eigenvalues
-    GenEigsSolver<SparseGenMatProd<double>> eigs(op, 3, 6);
+    GenEigsSolver<SparseGenMatProd<double>> eigs(op, 2, 6);
 
     // Initialize and compute
     eigs.init();
     eigs.compute(SortRule::LargestMagn);
 
-    // Retrieve results
-    Eigen::VectorXcd evalues;
     if (eigs.info() == CompInfo::Successful) {
-        evalues = eigs.eigenvalues();
-        std::cout << "Eigenvalues found:\n" << evalues << std::endl;
+        std::cout << "Eigenvalues found:\n" << eigs.eigenvalues() << std::endl;
     } else {
         std::cout << "Not Found" << std::endl;
     }
