@@ -1,35 +1,47 @@
-#include <Eigen/Dense>
-#include <Spectra/DavidsonSymEigsSolver.h>
-#include <Spectra/MatOp/DenseSymMatProd.h>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
+#include <Spectra/GenEigsSolver.h>
+#include <Spectra/MatOp/SparseGenMatProd.h>
 #include <iostream>
 
 using namespace Spectra;
 
+using T = Eigen::Triplet<double>;
+
 int main() {
-    Eigen::Index n = 1000;
-    Eigen::MatrixXd mat = 0.03 * Eigen::MatrixXd::Random(n, n);
-    Eigen::MatrixXd mat1 = mat + mat.transpose();
-    for (Eigen::Index i = 0; i < n; i++) {
-        mat1(i, i) += i + 1;
+    // A band matrix with 1 on the main diagonal, 2 on the below-main subdiagonal,
+    // and 3 on the above-main subdiagonal
+    const int n = 10;
+    std::vector<T> triplets;
+    for (int i = 0; i < n; i++) {
+        triplets.emplace_back(i, i, 1.0);
+        if (i > 0) {
+            triplets.emplace_back(i - 1, i, 3.0);
+        }
+        if (i < n - 1) {
+            triplets.emplace_back(i + 1, i, 2.0);
+        }
     }
+    Eigen::SparseMatrix<double> M(n, n);
+    M.insertFromTriplets(triplets.begin(), triplets.end());
 
-    DenseSymMatProd<double> op_dense(mat1);  // Create the Matrix Product operation
+    // Construct matrix operation object using the wrapper class SparseGenMatProd
+    SparseGenMatProd<double> op(M);
 
-    Eigen::Index num_of_eigenvalues = 5;
-    DavidsonSymEigsSolver <DenseSymMatProd<double>> solver(op_dense, num_of_eigenvalues);  // Create Solver
-    Eigen::Index iterations = 100;
-    double tolerance = 1e-3;
-    int nconv = solver.compute(SortRule::LargestAlge, iterations, tolerance);
+    // Construct eigen solver object, requesting the largest three eigenvalues
+    GenEigsSolver<SparseGenMatProd<double>> eigs(op, 3, 6);
+
+    // Initialize and compute
+    eigs.init();
+    eigs.compute(SortRule::LargestMagn);
 
     // Retrieve results
-    Eigen::VectorXd evalues;
-    if (solver.info() == CompInfo::Successful) {
-        evalues = solver.eigenvalues();
-
-        std::cout << nconv << " Eigenvalues found:\n"
-                  << evalues << std::endl;
+    Eigen::VectorXcd evalues;
+    if (eigs.info() == CompInfo::Successful) {
+        evalues = eigs.eigenvalues();
+        std::cout << "Eigenvalues found:\n" << evalues << std::endl;
     } else {
-        std::cout << "Calculation failed" << std::endl;
+        std::cout << "Not Found" << std::endl;
     }
     return 0;
 }
