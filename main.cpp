@@ -3,6 +3,7 @@
 #include <Spectra/GenEigsSolver.h>
 #include <Spectra/MatOp/SparseGenMatProd.h>
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 #include <cassert>
 
@@ -41,6 +42,13 @@ double flip_prob_metropolis(double beta, int local_energy, int spin) {
     }
 }
 
+/// same as Gibbs Sampler
+double flip_prob_heat_bath(double beta, int local_energy, int spin) {
+    double a = std::exp(static_cast<double>(local_energy * spin) * beta);
+    double b = std::exp(static_cast<double>(-local_energy * spin) * beta);
+    return a / (a + b);
+}
+
 void gen_uniform_random_choice_flip_prob(double beta, uint64_t spin, std::vector<T> &triplets,
                                          const std::function<double(double, int, int)> &flip_prob) {
     double stay_prob = 0.0;
@@ -57,14 +65,14 @@ void gen_uniform_random_choice_flip_prob(double beta, uint64_t spin, std::vector
 std::vector<double> calc_second_eigenvalue(double beta) {
     std::vector<T> triplets;
     for (uint64_t spin = 0; spin < MATRIX_SIZE; spin++) {
-        gen_uniform_random_choice_flip_prob(beta, spin, triplets, flip_prob_metropolis);
+        gen_uniform_random_choice_flip_prob(beta, spin, triplets, flip_prob_heat_bath);
     }
 
     Eigen::SparseMatrix<double> mat(MATRIX_SIZE, MATRIX_SIZE);
     mat.insertFromTriplets(triplets.begin(), triplets.end());
 
     SparseGenMatProd<double> op(mat);
-    GenEigsSolver<SparseGenMatProd<double>> eigs(op, 4, 10);
+    GenEigsSolver<SparseGenMatProd<double>> eigs(op, 4, 100);
     eigs.init();
     eigs.compute(SortRule::LargestMagn);
     assert(eigs.info() == CompInfo::Successful);
@@ -84,7 +92,7 @@ int main() {
         double t = static_cast<double>(ti) / static_cast<double>(temperature_step);
         double beta = 1.0 / t;
         auto e = calc_second_eigenvalue(beta);
-        std::cout << t << " " << e[0] << " " << e[1] << " " << e[2] << std::endl;
+        std::cout << std::setprecision(16) << t << " " << e[0] << " " << e[1] << " " << e[2] << std::endl;
     }
     return 0;
 }
